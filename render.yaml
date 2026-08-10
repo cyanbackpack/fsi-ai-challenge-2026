@@ -1,0 +1,25 @@
+# Render 배포 설정 (초안).
+#
+# 심사 기간(2026-09-07 11:00 ~ 09-11 23:59) 동안 접속이 끊기면 결격이므로,
+# 슬립이 없는 유료 인스턴스(starter 이상)를 사용합니다. free 플랜은 유휴 시
+# 슬립되어 첫 요청이 실패할 수 있습니다.
+services:
+  - type: web
+    name: fsi-ai-challenge-2026
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # 대시보드에서 직접 입력. 저장소에 커밋하지 않습니다.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-opus-5
+      - key: CLAUDE_EFFORT
+        value: high
