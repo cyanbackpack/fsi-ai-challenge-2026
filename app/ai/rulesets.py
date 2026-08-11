@@ -8,12 +8,9 @@ still verify a fact.
 
 Rules are ordered by how decisive they are, not alphabetically.
 
-⚠️ VERIFY BEFORE SUBMISSION
-The hotline numbers and legal deadlines in `CONTACTS` and in the post-transfer
-actions were written from general knowledge and have NOT been checked against a
-current official source. Wrong emergency guidance is worse than none. Confirm
-each against 금융감독원 / 경찰청 published material and update this block before
-the service is exposed to real users.
+Hotline numbers and the post-transfer procedure were verified 2026-08-11 against
+금융위원회 (fsc.go.kr) and 은행연합회 소비자포털 (portal.kfb.or.kr). Re-check before
+submission — wrong emergency guidance is worse than none.
 """
 
 from __future__ import annotations
@@ -22,8 +19,8 @@ from app.ai.rules import Rule, RuleEngine, keyword_rule, signal_rule, stage_rule
 from app.ai.schemas import Stage
 
 CONTACTS = {
-    "police": "112",  # 경찰 (보이스피싱 신고)
-    "fss": "1332",  # 금융감독원 상담
+    "police": "112",  # 경찰청 — 보이스피싱 피해 신고 (통합신고대응센터)
+    "fss": "1332",  # 금융감독원 — 상담·문의
 }
 
 
@@ -251,11 +248,13 @@ POST_TRANSFER: list[Rule] = [
             "지급정지는 신고가 빠를수록 성공률이 높으므로 지금 바로 진행하세요."
         ),
         actions=(
-            f"거래 은행 콜센터 또는 {CONTACTS['police']}에 전화해 지급정지를 요청하세요.",
-            "송금한 계좌번호, 금액, 시각을 메모해 두세요. 신고 시 바로 필요합니다.",
-            "은행 영업점에 피해구제(피해금 환급)를 신청하세요.",
-            f"추가 상담이 필요하면 금융감독원 {CONTACTS['fss']}로 문의하세요.",
-            "본인 명의로 개통된 휴대폰·계좌가 더 있는지 확인하세요.",
+            f"거래 은행 콜센터 또는 {CONTACTS['police']}에 전화해 지급정지를 요청하세요. "
+            "긴급한 경우 전화만으로 신청할 수 있습니다.",
+            "송금한 계좌번호, 금액, 시각을 메모해 두세요. 신고할 때 바로 필요합니다.",
+            "경찰서에서 '사건사고사실확인원'을 발급받으세요. 피해구제 신청에 필요합니다.",
+            "확인원과 신분증 사본을 가지고 은행 영업점에서 '피해구제 신청서'를 제출하세요.",
+            f"절차가 헷갈리면 금융감독원 {CONTACTS['fss']}로 문의하세요.",
+            "본인 명의로 몰래 개통된 휴대폰·계좌가 없는지 확인하세요.",
         ),
     ),
 ]

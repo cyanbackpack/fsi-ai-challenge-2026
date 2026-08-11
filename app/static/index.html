@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보이스피싱 확인 도우미</title>
+<!-- Inline so the browser never requests /favicon.ico and never 404s. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128737;</text></svg>">
+<style>
+  /* No web fonts, no CDN: the page must render on a bad connection and it must
+     not depend on a third party staying up during the judging window. */
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --ink: #14171a;
+    --muted: #5a6570;
+    --line: #d8dde3;
+    --danger: #c0271c;
+    --danger-bg: #fdf0ef;
+    --warn: #9a5b00;
+    --safe: #1c6b3f;
+    --accent: #17458f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    /* Elderly users are a core audience: large base type, high contrast. */
+    font: 18px/1.65 system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 28px; }
+
+  .choice { display: grid; gap: 14px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 12px;
+    border: 2px solid transparent;
+  }
+  .big {
+    padding: 22px 20px;
+    text-align: left;
+    background: var(--card);
+    border-color: var(--line);
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .big:hover { border-color: var(--accent); }
+  .big small { display: block; font-weight: 400; font-size: 16px; color: var(--muted); margin-top: 4px; }
+  .big.urgent { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+
+  textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 14px;
+    font: inherit;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .submit {
+    margin-top: 12px;
+    width: 100%;
+    padding: 16px;
+    font-size: 19px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+  }
+  .submit[disabled] { background: var(--muted); cursor: progress; }
+  .back {
+    background: none;
+    border: none;
+    color: var(--accent);
+    padding: 8px 0;
+    font-size: 16px;
+    text-decoration: underline;
+  }
+
+  .verdict { padding: 18px 20px; border-radius: 12px; margin: 20px 0; }
+  .verdict h2 { margin: 0 0 6px; font-size: 22px; }
+  .verdict p { margin: 0; }
+  .v-critical, .v-high { background: var(--danger-bg); color: var(--danger); }
+  .v-medium { background: #fdf6e8; color: var(--warn); }
+  .v-low { background: #eef7f1; color: var(--safe); }
+
+  h3 { font-size: 17px; color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
+
+  /* The rebuttal is the product. It gets the largest type on the page; the
+     pattern name is demoted to a label above it. */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--danger);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .card .label { font-size: 14px; color: var(--muted); letter-spacing: .02em; }
+  .card .rebuttal { font-size: 19px; font-weight: 600; margin: 6px 0 0; }
+  .card .detail { font-size: 16px; color: var(--muted); margin: 8px 0 0; }
+  .card .by-llm { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; }
+  ol.steps li {
+    counter-increment: s;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px 16px 58px;
+    margin-bottom: 10px;
+    position: relative;
+    font-size: 18px;
+  }
+  ol.steps li::before {
+    content: counter(s);
+    position: absolute; left: 16px; top: 14px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ol.steps li.now { border-color: var(--danger); }
+  ol.steps li.now::before { background: var(--danger); }
+
+  .note {
+    font-size: 15px; color: var(--muted);
+    background: #fff8e6; border: 1px solid #e8d9a8;
+    border-radius: 10px; padding: 12px 14px; margin: 16px 0;
+  }
+  .error { color: var(--danger); font-weight: 600; }
+  .hidden { display: none; }
+  footer { margin-top: 40px; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>보이스피싱 확인 도우미</h1>
+  <p class="lede">상대방 말이 사실인지 지금 확인해 보세요.</p>
+
+  <!-- Step 1: the stage question. It changes what the whole page is for. -->
+  <section id="choice">
+    <div class="choice">
+      <button class="big" data-stage="ongoing">
+        아직 송금하지 않았어요
+        <small>통화 중이거나 방금 끊었습니다</small>
+      </button>
+      <button class="big urgent" data-stage="after_transfer">
+        이미 송금했어요
+        <small>지금 바로 해야 할 일을 알려드립니다</small>
+      </button>
+    </div>
+  </section>
+
+  <!-- Step 2a: still persuadable — collect what was said. -->
+  <section id="input" class="hidden">
+    <button class="back" data-back>← 처음으로</button>
+    <h3>상대방이 뭐라고 했나요?</h3>
+    <textarea id="text" placeholder="기억나는 대로 적으셔도 됩니다. 문자를 받았다면 그대로 붙여넣으세요."></textarea>
+    <button class="submit" id="go">확인하기</button>
+    <p id="error" class="error hidden"></p>
+  </section>
+
+  <!-- Step 3: result. -->
+  <section id="result" class="hidden">
+    <button class="back" data-back>← 처음으로</button>
+    <div id="verdict" class="verdict"></div>
+    <div id="degraded" class="note hidden">
+      지금은 간이 분석 결과입니다. 아래 내용은 확인된 규칙에 따른 것이니 그대로 따르셔도 됩니다.
+    </div>
+    <div id="rebuttals"></div>
+    <div id="actions"></div>
+  </section>
+
+  <footer>
+    경찰 신고 <strong>112</strong> · 금융감독원 상담 <strong>1332</strong><br>
+    2026 금융 AI Challenge 출품작입니다. 법률 자문이 아니며, 긴급한 경우 반드시 112로 신고하세요.
+  </footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (id) => $(id).classList.remove('hidden');
+const hide = (id) => $(id).classList.add('hidden');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const LEVEL_TEXT = {
+  critical: ['매우 위험합니다', '보이스피싱일 가능성이 매우 높습니다. 절대 송금하지 마세요.'],
+  high:     ['위험합니다', '보이스피싱 수법이 여러 개 확인됐습니다.'],
+  medium:   ['주의가 필요합니다', '의심스러운 점이 있습니다. 확인 후 진행하세요.'],
+  low:      ['특별한 위험 신호는 없습니다', '다만 확인되지 않은 상대에게 송금하지는 마세요.'],
+};
+
+// After a transfer there is no live claim to rebut and no risk to warn about —
+// it already happened. Both headings change to match what the reader needs.
+const AFTER = {
+  heading: '지금 바로 신고하세요',
+  section: '아직 돌려받을 수 있습니다',
+};
+
+function analyze(stage, text) {
+  return fetch('/api/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ text, stage }),
+  }).then((r) => {
+    if (!r.ok) throw new Error('서버 오류 (' + r.status + ')');
+    return r.json();
+  });
+}
+
+function render(data) {
+  const after = data.stage === 'after_transfer';
+  const [head, sub] = LEVEL_TEXT[data.level] || LEVEL_TEXT.medium;
+  const v = $('verdict');
+  v.className = 'verdict v-' + data.level;
+  v.innerHTML = '<h2>' + esc(after ? AFTER.heading : head) + '</h2>'
+              + '<p>' + esc(data.summary || sub) + '</p>';
+
+  $('degraded').classList.toggle('hidden', !data.degraded);
+
+  // Rebuttals lead. A finding with no rebuttal has nothing to show a persuaded
+  // person, so it is dropped from the UI rather than padded out.
+  const cards = (data.findings || []).filter((f) => f.rebuttal);
+  $('rebuttals').innerHTML = cards.length
+    ? `<h3>${esc(after ? AFTER.section : '상대방 말이 사실이 아닌 이유')}</h3>` + cards.map((f) => `
+        <div class="card">
+          <div class="label">${esc(f.title)}</div>
+          <p class="rebuttal">${esc(f.rebuttal)}</p>
+          ${f.detail ? `<p class="detail">${esc(f.detail)}</p>` : ''}
+          ${f.source === 'llm' ? '<p class="by-llm">AI가 이 대화에서 추가로 발견한 정황입니다.</p>' : ''}
+        </div>`).join('')
+    : '';
+
+  const steps = data.actions || [];
+  $('actions').innerHTML = steps.length
+    ? '<h3>지금 하실 일</h3><ol class="steps">' + steps.map((a) =>
+        `<li class="${a.urgency === 'now' ? 'now' : ''}">${esc(a.instruction)}</li>`).join('') + '</ol>'
+    : '';
+
+  hide('choice'); hide('input'); show('result');
+  window.scrollTo(0, 0);
+}
+
+function fail(message) {
+  const e = $('error');
+  e.textContent = message + ' 급하시면 112로 바로 신고하세요.';
+  show('error');
+}
+
+document.querySelectorAll('[data-stage]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const stage = btn.dataset.stage;
+    if (stage === 'ongoing') {
+      hide('choice'); show('input'); $('text').focus();
+      return;
+    }
+    // After a transfer there is nothing to ask. Go straight to the steps.
+    analyze(stage, '').then(render).catch((err) => {
+      hide('choice'); show('input'); fail(err.message);
+    });
+  });
+});
+
+$('go').addEventListener('click', () => {
+  const text = $('text').value.trim();
+  if (!text) { fail('내용을 입력해 주세요.'); return; }
+  hide('error');
+  $('go').disabled = true;
+  $('go').textContent = '확인하는 중…';
+  analyze('ongoing', text)
+    .catch((err) => { fail(err.message); throw err; })
+    .then(render)
+    .catch(() => {})
+    .finally(() => { $('go').disabled = false; $('go').textContent = '확인하기'; });
+});
+
+document.querySelectorAll('[data-back]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    hide('input'); hide('result'); hide('error'); show('choice');
+    $('text').value = '';
+  });
+});
+</script>
+</body>
+</html>

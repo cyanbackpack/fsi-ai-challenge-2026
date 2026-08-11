@@ -184,14 +184,16 @@ class RuleEngine:
 
     @staticmethod
     def _summarize(stage: Stage, level: RiskLevel, match_count: int) -> str:
+        # No enum values in user-facing copy — the UI already states the level in
+        # Korean above this line, and "critical" means nothing to the reader.
         if stage is Stage.AFTER_TRANSFER:
             return (
-                "이미 송금이 이루어진 상황입니다. 지급정지는 시간이 지날수록 "
-                "성공률이 떨어지니 아래 순서대로 즉시 진행하세요."
+                "지급정지는 신고가 빠를수록 성공률이 높습니다. "
+                "아래 순서대로 지금 바로 진행하세요."
             )
         if match_count == 0:
-            return "입력된 내용에서는 알려진 보이스피싱 수법이 탐지되지 않았습니다."
+            return "입력하신 내용에서는 알려진 보이스피싱 수법이 발견되지 않았습니다."
         return (
-            f"위험도 {level.value} — 보이스피싱에서 반복적으로 확인되는 수법 "
-            f"{match_count}가지가 탐지되었습니다. 아래 반박 근거를 직접 확인해 보세요."
+            f"보이스피싱에서 반복적으로 확인되는 수법 {match_count}가지가 발견됐습니다. "
+            "아래 근거를 직접 확인해 보세요."
         )

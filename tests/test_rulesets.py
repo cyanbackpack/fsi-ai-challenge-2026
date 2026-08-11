@@ -46,3 +46,19 @@ def test_benign_text_does_not_reach_critical(text):
     assert result.level is not RiskLevel.CRITICAL, (
         f"false positive on {text!r}: {[f.code for f in result.findings]}"
     )
+
+
+@pytest.mark.parametrize("text,stage", [
+    ("안전계좌로 이체하세요", "ongoing"),
+    ("", "after_transfer"),
+    ("안녕하세요", "ongoing"),
+])
+def test_summary_has_no_enum_leakage(text, stage):
+    """User-facing copy is Korean; 'critical' means nothing to the reader."""
+    from app.ai.schemas import Stage
+
+    result = build_engine().evaluate(
+        AnalysisRequest(text=text, stage=Stage(stage))
+    )
+    for level in RiskLevel:
+        assert level.value not in result.summary

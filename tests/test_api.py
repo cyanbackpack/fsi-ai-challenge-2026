@@ -45,3 +45,16 @@ def test_analyze_rejects_unknown_stage():
 def test_analyze_rejects_oversized_text():
     response = client.post("/api/analyze", json={"text": "가" * 20_001})
     assert response.status_code == 422
+
+
+def test_index_is_served():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "보이스피싱" in response.text
+
+
+def test_index_loads_no_third_party_resources():
+    """A dead CDN during the judging window must not be able to break the page."""
+    html = client.get("/").text
+    for pattern in ('src="http', "src='http", 'href="http', "href='http", "@import"):
+        assert pattern not in html, f"external resource reference: {pattern}"

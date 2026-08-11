@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.ai.client import ClaudeClient
 from app.ai.engine import HybridEngine
@@ -26,6 +29,14 @@ app.add_middleware(
 )
 
 engine = HybridEngine(rules=build_engine(), llm=ClaudeClient(settings))
+
+INDEX = Path(__file__).parent / "static" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+async def index() -> FileResponse:
+    """Serve the single-page UI. No build step, so nothing to break on deploy."""
+    return FileResponse(INDEX)
 
 
 @app.get("/health")
