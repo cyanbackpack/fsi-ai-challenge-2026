@@ -41,6 +41,10 @@ def _render(findings: list[Finding]) -> str:
     return "\n".join(f"- [{f.code}] {f.title} (weight {f.weight})" for f in findings)
 
 
+def _next_order(actions: list[Action]) -> int:
+    return max((a.order for a in actions), default=0) + 1
+
+
 def _merge(baseline: AnalysisResult, analysis: LLMAnalysis) -> AnalysisResult:
     # Rules set the floor; the model may only raise the score.
     score = max(baseline.score, min(analysis.score, 100.0))
@@ -56,11 +60,14 @@ def _merge(baseline: AnalysisResult, analysis: LLMAnalysis) -> AnalysisResult:
                 code=item.code,
                 title=item.title,
                 detail=item.detail,
+                rebuttal=item.rebuttal,
                 weight=item.weight,
                 source="llm",
             )
         )
 
+    # Rule actions keep their positions — they are the vetted ones, and after a
+    # transfer they are the emergency steps. Model suggestions append.
     actions = list(baseline.actions)
     seen = {a.instruction for a in actions}
     for item in analysis.actions:
@@ -69,7 +76,7 @@ def _merge(baseline: AnalysisResult, analysis: LLMAnalysis) -> AnalysisResult:
         seen.add(item.instruction)
         actions.append(
             Action(
-                order=len(actions) + 1,
+                order=_next_order(actions),
                 instruction=item.instruction,
                 urgency=item.urgency,
             )
@@ -79,6 +86,7 @@ def _merge(baseline: AnalysisResult, analysis: LLMAnalysis) -> AnalysisResult:
         score=score,
         level=RiskLevel.from_score(score),
         summary=analysis.summary or baseline.summary,
+        stage=baseline.stage,
         findings=findings,
         actions=actions,
         engine="hybrid",

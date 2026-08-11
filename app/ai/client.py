@@ -25,6 +25,13 @@ class LLMFinding(BaseModel):
     code: str = Field(description="Short stable slug, e.g. 'urgency.pressure'.")
     title: str = Field(description="One-line label in the requested locale.")
     detail: str = Field(default="", description="Why this matters, 1-2 sentences.")
+    rebuttal: str = Field(
+        default="",
+        description=(
+            "The reason the caller's specific claim is false, phrased so the "
+            "reader can verify it themselves rather than having to trust us."
+        ),
+    )
     weight: float = Field(
         default=0.0, ge=0, le=100, description="Points this contributes to the score."
     )
@@ -45,14 +52,33 @@ class LLMAnalysis(BaseModel):
 
 
 SYSTEM_PROMPT = """\
-You analyse financial-service requests and return a structured risk assessment.
+You help someone who may be in the middle of a voice-phishing scam right now.
 
-Base every finding on evidence present in the input. When the input is thin, say \
-so in the summary and score conservatively rather than inventing signals.
+Assume the reader has already been persuaded by the caller. Telling them "this is \
+a scam" does not work — to them you are one more stranger making a claim. What \
+works is a fact they can check for themselves: that the procedure the caller \
+described does not exist, that the official number differs from the one they were \
+given, that no real institution asks for this. Put that in `rebuttal`, and write \
+it as something they can verify, not as something they must take on faith.
 
-Write `summary`, `title`, `detail`, and `instruction` in the language named by \
-the request's locale. Keep the summary to two or three sentences and each action \
-to a single concrete step the reader can take immediately.\
+A deterministic rule engine has already run and its findings are given to you. Do \
+not restate them. Add what it missed — manipulation tactics specific to this \
+conversation, internal contradictions in the caller's story, details that are \
+implausible for the institution being claimed. If it missed nothing, return no \
+findings; an empty list is a valid and useful answer.
+
+Ground every finding in something actually present in the input. If the input is \
+too thin to judge, say so in the summary and score low rather than filling the \
+gap. A false alarm teaches this person to ignore the next warning.
+
+When `stage` is `after_transfer`, the persuasion question is settled and speed is \
+all that matters: keep the summary to one or two sentences and let the actions \
+carry the weight.
+
+Write every user-facing string in the language named by the request's locale. \
+Keep the summary to two or three sentences and each action to one concrete step \
+that can be taken immediately. Prefer plain words over financial or legal jargon — \
+the reader may be elderly, distressed, or both.\
 """
 
 
@@ -114,7 +140,7 @@ class ClaudeClient:
 
 
 def _build_user_message(request: AnalysisRequest, context: str) -> str:
-    parts = [f"locale: {request.locale}"]
+    parts = [f"locale: {request.locale}", f"stage: {request.stage.value}"]
     if context:
         parts.append(f"<deterministic_findings>\n{context}\n</deterministic_findings>")
     if request.signals:
